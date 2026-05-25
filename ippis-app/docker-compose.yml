@@ -20,6 +20,18 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/authdb
       SECRET_KEY: change-me-in-production
+      # SSO — browser-facing URLs use localhost; server-side calls use
+      # host.docker.internal so the container can reach the SSO stack on the host.
+      SSO_CLIENT_ID: ippis-portal
+      SSO_CLIENT_SECRET: ippis-secret-key
+      SSO_AUTHORIZE_URL: http://localhost:8000/oauth2/authorize
+      SSO_TOKEN_URL: http://host.docker.internal:8000/oauth2/token
+      SSO_USERINFO_URL: http://host.docker.internal:8000/auth/userinfo
+      SSO_LOGOUT_URL: http://localhost:8000/oauth2/logout
+      REDIRECT_URI: http://localhost:5000/callback
+      POST_LOGOUT_REDIRECT_URI: http://localhost:5000/
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
