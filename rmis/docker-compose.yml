@@ -1,0 +1,57 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rmis-postgres
+    environment:
+      POSTGRES_DB: rmis_db
+      POSTGRES_USER: rmis_user
+      POSTGRES_PASSWORD: rmis_pass
+    volumes:
+      - rmis_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rmis_user -d rmis_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rmis-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rmis-backend
+    environment:
+      DB_USERNAME: rmis_user
+      DB_PASSWORD: rmis_pass
+      JWT_SECRET: rmis-super-secret-key-change-in-production-must-be-256bits-long
+      CORS_ORIGINS: http://localhost:4200,http://localhost
+    ports:
+      - "8085:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rmis-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rmis-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - rmis-net
+
+volumes:
+  rmis_pg_data:
+
+networks:
+  rmis-net:
+    driver: bridge
