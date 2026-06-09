@@ -32,6 +32,10 @@ public class User {
     @Column(name = "full_name")
     private String fullName;
 
+    /** Keycloak "sub" claim — stable id linking this row to the SSO identity. Null for local-only users. */
+    @Column(name = "sso_subject", unique = true)
+    private String ssoSubject;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

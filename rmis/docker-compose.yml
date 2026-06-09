@@ -29,8 +29,27 @@ services:
       DB_PASSWORD: rmis_pass
       JWT_SECRET: rmis-super-secret-key-change-in-production-must-be-256bits-long
       CORS_ORIGINS: http://localhost:4200,http://localhost
+      # [GoR-SSO] OIDC client config (see backend application.properties for what each does)
+      CLIENT_ID: rmis-portal                                                              # [GoR-SSO]
+      # [GoR-SSO] Secret is NOT committed — supplied via rmis/.env (gitignored) at `up` time.
+      CLIENT_SECRET: ${CLIENT_SECRET:?CLIENT_SECRET must be set (see rmis/.env)}            # [GoR-SSO]
+      # [GoR-SSO] iss is COMPARED only -> keep the value Keycloak stamps (localhost:8080)
+      SSO_ISSUER_URI: http://localhost:8080/realms/government-internal                    # [GoR-SSO]
+      # [GoR-SSO] these are FETCHED/redirected server-side from inside the container, so
+      # [GoR-SSO] Keycloak/wrapper are reached via host.docker.internal (host-published ports)
+      SSO_JWK_SET_URI: http://host.docker.internal:8080/realms/government-internal/protocol/openid-connect/certs  # [GoR-SSO]
+      SSO_TOKEN_URI: http://host.docker.internal:8000/oauth2/token                        # [GoR-SSO]
+      SSO_USERINFO_URI: http://host.docker.internal:8000/auth/userinfo                    # [GoR-SSO]
+      # [GoR-SSO] authorization-uri is browser-facing -> localhost (the host's :8000)
+      SSO_AUTH_URI: http://localhost:8000/oauth2/authorize                                # [GoR-SSO]
+      # [GoR-SSO] after login, bounce the browser back to the RMIS SPA (host :80)
+      FRONTEND_URL: http://localhost                                                      # [GoR-SSO]
     ports:
       - "8085:8080"
+    # [GoR-SSO] lets the container resolve host.docker.internal to the host gateway
+    # [GoR-SSO] (automatic on Docker Desktop; explicit here so Linux hosts work too)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

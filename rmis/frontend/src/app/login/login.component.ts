@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -45,6 +46,13 @@ import { AuthService } from '../services/auth.service';
             {{ loading ? 'Please wait...' : (isRegister ? 'Register' : 'Sign In') }}
           </button>
         </form>
+
+        <div class="divider"><span>or</span></div>
+
+        <button type="button" class="btn-sso" (click)="loginWithSso()">
+          <span class="sso-mark">GoR</span>
+          Continue with Government SSO
+        </button>
 
         <div class="auth-footer">
           <span *ngIf="!isRegister">Don't have an account?
@@ -103,6 +111,26 @@ import { AuthService } from '../services/auth.service';
     }
     .btn-primary:hover:not(:disabled) { background: #0b5ed7; }
     .btn-primary:disabled { opacity: .7; cursor: not-allowed; }
+    .divider {
+      display: flex; align-items: center; text-align: center;
+      color: #9ca3af; font-size: 12px; margin: 20px 0;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; border-bottom: 1px solid #e5e7eb;
+    }
+    .divider span { padding: 0 12px; text-transform: uppercase; letter-spacing: 1px; }
+    .btn-sso {
+      width: 100%; padding: 12px; background: #fff; color: #1a3a5c;
+      border: 1.5px solid #1a3a5c; border-radius: 8px; font-size: 15px;
+      font-weight: 600; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 10px; transition: background .2s, color .2s;
+    }
+    .btn-sso:hover { background: #1a3a5c; color: #fff; }
+    .sso-mark {
+      background: #1a3a5c; color: #fff; font-size: 11px; font-weight: 800;
+      letter-spacing: 1px; padding: 3px 7px; border-radius: 5px;
+    }
+    .btn-sso:hover .sso-mark { background: #fff; color: #1a3a5c; }
     .error-alert {
       background: #fee2e2; color: #dc2626; border-radius: 8px;
       padding: 10px 14px; font-size: 13px; margin-bottom: 12px;
@@ -147,5 +175,12 @@ export class LoginComponent {
   toggleMode(): void {
     this.isRegister = !this.isRegister;
     this.errorMessage = '';
+  }
+
+  loginWithSso(): void {
+    // [GoR-SSO] Full-page navigation (not XHR): the browser must physically travel to
+    // [GoR-SSO] the SSO login and back. Hitting Spring's /oauth2/authorization/gor makes
+    // [GoR-SSO] Spring Security build the PKCE+state authorize URL and 302 to the platform.
+    window.location.href = environment.ssoLoginUrl;
   }
 }
