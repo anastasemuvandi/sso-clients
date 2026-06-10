@@ -48,11 +48,18 @@ public class SsoLoginSuccessHandler implements AuthenticationSuccessHandler {   
         UserDetails details = userDetailsService.loadUserByUsername(user.getUsername());// [GoR-SSO]
         String rmisToken = jwtTokenProvider.generateToken(details);                     // [GoR-SSO]
 
-        // [GoR-SSO] Hand the token to the SPA via the URL fragment (fragments are not
-        // [GoR-SSO] sent to servers nor written to access logs as query params).
+        // [GoR-SSO] Capture the raw id_token Keycloak returned at the code->token exchange.
+        // [GoR-SSO] We hand it to the SPA so it can later perform RP-initiated (single)
+        // [GoR-SSO] logout: passing it back as id_token_hint to /oauth2/logout ends the
+        // [GoR-SSO] Keycloak SSO session, signing the user out of EVERY ministry app at once.
+        String idToken = oidcUser.getIdToken().getTokenValue();                         // [GoR-SSO]
+
+        // [GoR-SSO] Hand the tokens to the SPA via the URL fragment (fragments are not
+        // [GoR-SSO] sent to servers nor written to access logs as query params). JWTs are
+        // [GoR-SSO] base64url (no '+', '&' or '#'), so they're safe to join with '&'.
         String target = UriComponentsBuilder.fromUriString(frontendUrl)                 // [GoR-SSO]
                 .path("/sso/callback")                                                  // [GoR-SSO]
-                .fragment("token=" + rmisToken)                                         // [GoR-SSO]
+                .fragment("token=" + rmisToken + "&id_token=" + idToken)                // [GoR-SSO]
                 .build().toUriString();                                                 // [GoR-SSO]
         response.sendRedirect(target);                                                  // [GoR-SSO]
     }                                                                                   // [GoR-SSO]

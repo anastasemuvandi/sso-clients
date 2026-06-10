@@ -43,8 +43,9 @@ export class SsoCallbackComponent implements OnInit {              // [GoR-SSO]
     const rawHash = window.location.hash.startsWith('#')           // [GoR-SSO]
       ? window.location.hash.substring(1)                          // [GoR-SSO] drop the '#'
       : window.location.hash;                                      // [GoR-SSO]
-    const fragment = new URLSearchParams(rawHash);                 // [GoR-SSO] parse "token=…&…"
+    const fragment = new URLSearchParams(rawHash);                 // [GoR-SSO] parse "token=…&id_token=…"
     const token = fragment.get('token');                          // [GoR-SSO] the RMIS JWT minted by the backend
+    const idToken = fragment.get('id_token');                     // [GoR-SSO] Keycloak id_token, kept for RP-initiated logout
 
     // [GoR-SSO] On failure the backend redirects to /login?sso_error=… (a QUERY param),
     // [GoR-SSO] so also inspect the query string here.
@@ -59,7 +60,7 @@ export class SsoCallbackComponent implements OnInit {              // [GoR-SSO]
       return;                                                      // [GoR-SSO] stop here
     }
 
-    this.auth.loginWithSsoToken(token);                            // [GoR-SSO] persist the session (token + claims)
+    this.auth.loginWithSsoToken(token, idToken ?? undefined);      // [GoR-SSO] persist the session (token + claims + id_token)
 
     // [GoR-SSO] Scrub the token from the address bar / history before moving on,
     // [GoR-SSO] so it isn't left in the browser history or copy-pasted by accident.
