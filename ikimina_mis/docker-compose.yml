@@ -1,0 +1,79 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ikimina-postgres
+    environment:
+      POSTGRES_DB: ikimina_db
+      POSTGRES_USER: ikimina_user
+      POSTGRES_PASSWORD: ikimina_pass
+    volumes:
+      - ikimina_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ikimina_user -d ikimina_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ikimina-net
+
+  # Dev SMTP sink. The backend sends 2FA / password-reset emails here; read them
+  # in the web UI at http://localhost:8025. No real mail server needed.
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: ikimina-mailhog
+    ports:
+      - "8125:1025"   # SMTP   (host 8125 -> container 1025)
+      - "8126:8025"   # web UI (host 8126 -> container 8025)
+    networks:
+      - ikimina-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # Build-time host networking so Maven can reach repo.maven.apache.org
+      # (the default build network has no DNS on this Docker Desktop setup).
+      network: host
+    container_name: ikimina-backend
+    environment:
+      DB_USERNAME: ikimina_user
+      DB_PASSWORD: ikimina_pass
+      JWT_SECRET: ikimina-super-secret-key-change-in-production-must-be-256bits-long
+      CORS_ORIGINS: http://localhost:4200,http://localhost:8180
+      # Email -> MailHog container (no auth, no TLS). Override to use real SMTP.
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      MAIL_FROM: no-reply@ikimina.gov.rw
+    ports:
+      - "8186:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    networks:
+      - ikimina-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # Build-time host networking so npm can reach the registry (see backend note).
+      network: host
+    container_name: ikimina-frontend
+    ports:
+      - "8180:80"
+    depends_on:
+      - backend
+    networks:
+      - ikimina-net
+
+volumes:
+  ikimina_pg_data:
+
+networks:
+  ikimina-net:
+    driver: bridge
