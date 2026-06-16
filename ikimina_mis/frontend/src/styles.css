@@ -63,6 +63,24 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .btn-primary:hover:not(:disabled) { background: #15803d; }
 .btn-primary:disabled { opacity: .7; cursor: not-allowed; }
 
+/* Divider between local sign-in and the SSO button. */
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0; color: #9ca3af; font-size: 13px;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: #e5e7eb;
+}
+
+/* "Sign in with GoR SSO" — secondary style so it reads distinct from the primary submit. */
+.btn-sso {
+  width: 100%; padding: 12px; background: #fff; color: #16a34a;
+  border: 1px solid #16a34a; border-radius: 8px; font-size: 15px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; gap: 8px; transition: background .2s, color .2s;
+}
+.btn-sso:hover { background: #16a34a; color: #fff; }
+
 .spinner {
   width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
   border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite;

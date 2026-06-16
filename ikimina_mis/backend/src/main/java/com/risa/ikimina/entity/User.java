@@ -40,6 +40,10 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Stable link to the SSO identity (Keycloak "sub"); null for local-only accounts. */
+    @Column(name = "sso_subject", unique = true)
+    private String ssoSubject;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

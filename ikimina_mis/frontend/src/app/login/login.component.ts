@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import {environment} from "../../environments/environment";
 
 @Component({
   selector: 'app-login',
@@ -52,6 +53,13 @@ import { AuthService } from '../services/auth.service';
           </button>
         </form>
 
+        <div class="auth-divider"><span>or</span></div>
+
+        <!-- Full-page navigation to the IdP; not a form submit. -->
+        <button type="button" class="btn-sso" (click)="loginWithSso()">
+          Sign in with GoR SSO
+        </button>
+
         <div class="auth-footer">
           <a routerLink="/forgot-password">Forgot password?</a>
         </div>
@@ -70,7 +78,10 @@ export class LoginComponent {
   showPassword = false;
 
   constructor(private auth: AuthService, private router: Router) {}
-
+    loginWithSso(): void {
+        // FULL-PAGE navigation (not XHR) — the browser must travel to the IdP and back.
+        window.location.href = environment.ssoLoginUrl;
+    }
   submit(): void {
     this.errorMessage = '';
     this.loading = true;

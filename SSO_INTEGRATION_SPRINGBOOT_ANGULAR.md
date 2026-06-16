@@ -75,7 +75,15 @@ Spring Security's `oauth2-client` drives PKCE, state, the code→token exchange,
 and the userinfo call. You write ~3 small pieces: a client registration, a
 success handler (the "bridge"), and a security‑config tweak.
 
-### 2.1 Dependency (`pom.xml`)
+> **Where the backend code lives.** All paths below are relative to the app's
+> backend module (RMIS: `rmis/backend/`). Java classes live under
+> `src/main/java/<base-package>/…` — for RMIS the base package is
+> `com.risa.rmis`, so the folder is `src/main/java/com/risa/rmis/`. Substitute
+> your own package/folder. Config lives in `src/main/resources/`.
+
+### 2.1 Dependency — **file:** `backend/pom.xml`
+
+Add inside the existing `<dependencies>` block:
 
 ```xml
 <dependency>
@@ -84,11 +92,11 @@ success handler (the "bridge"), and a security‑config tweak.
 </dependency>
 ```
 
-### 2.2 Config (`application.properties`)
+### 2.2 Config — **file:** `backend/src/main/resources/application.properties`
 
-Split the **issuer** (compared, never fetched) from the **jwk‑set / endpoints**
-(fetched server‑side). All overridable by env so the same jar works on host and
-in Docker:
+Append these to the existing properties file. Split the **issuer** (compared,
+never fetched) from the **jwk‑set / endpoints** (fetched server‑side). All
+overridable by env so the same jar works on host and in Docker:
 
 ```properties
 # COMPARED to id_token "iss" — stays localhost:8080 even inside Docker
@@ -106,8 +114,9 @@ app.sso.client-secret=${CLIENT_SECRET:}
 app.frontend.url=${FRONTEND_URL:http://localhost:4200}
 ```
 
-### 2.3 Client registration (`SsoClientConfig`)
+### 2.3 Client registration — **new file:** `backend/src/main/java/<base-package>/config/SsoClientConfig.java`
 
+(RMIS: `backend/src/main/java/com/risa/rmis/config/SsoClientConfig.java`.)
 Build it **manually** (not `fromIssuerLocation`) so issuer and JWKS can differ:
 
 ```java
@@ -138,7 +147,31 @@ public class SsoClientConfig {
 
 No network call at startup — JWKS is fetched lazily on first token validation.
 
-### 2.4 Security config (`SecurityConfig`)
+### 2.4 Security config — **file:** `backend/src/main/java/<base-package>/config/SecurityConfig.java`
+
+(RMIS: `backend/src/main/java/com/risa/rmis/config/SecurityConfig.java`.) Edit
+your existing `securityFilterChain` bean — add the PKCE resolver and the
+`.oauth2Login(...)` block.
+
+> **Merge into your existing chain — do NOT add a second `securityFilterChain`
+> bean.** A local-auth app already has one (typically `STATELESS`, a
+> `DaoAuthenticationProvider`, a CORS bean, and a JWT filter). Two beans of this
+> type make Spring fail at startup with *"a bean of type SecurityFilterChain …
+> already defined"*. So edit the method you have:
+> - **Add** `SsoLoginSuccessHandler successHandler` and
+>   `ClientRegistrationRepository clients` as **method parameters** (not
+>   constructor fields — that creates a cycle: `SecurityConfig` → handler →
+>   `passwordEncoder()` → `SecurityConfig`; see Gotchas).
+> - **Change** `SessionCreationPolicy.STATELESS` → `IF_REQUIRED` — the OAuth2
+>   login redirect round-trip stores `state`/PKCE in the session; `STATELESS`
+>   drops it and the callback fails with *"authorization request not found"*.
+>   (Your JWT filter still makes API calls effectively stateless — no session is
+>   created unless the login flow needs one.)
+> - **Add** `/oauth2/**` and `/login/oauth2/**` to the `permitAll()` matchers
+>   (alongside your existing `/api/auth/**`).
+> - **Add** the PKCE resolver and the `.oauth2Login(...)` block below.
+> - **Keep** your `DaoAuthenticationProvider`, `PasswordEncoder`,
+>   `AuthenticationManager`, CORS, and 401 entry-point beans/wiring as-is.
 
 ```java
 @Bean
@@ -170,8 +203,9 @@ public SecurityFilterChain securityFilterChain(
 }
 ```
 
-### 2.5 The bridge (`SsoLoginSuccessHandler`)
+### 2.5 The bridge — **new file:** `backend/src/main/java/<base-package>/security/SsoLoginSuccessHandler.java`
 
+(RMIS: `backend/src/main/java/com/risa/rmis/security/SsoLoginSuccessHandler.java`.)
 Maps the SSO identity to a **local** user and issues **your app's own JWT**, so
 the rest of the app (guard, interceptor, dashboard) is unchanged:
 
@@ -201,12 +235,16 @@ the same email; (3) else create with a random unusable local password. Read
 `first_name`/`last_name`/`email` from the **userinfo** (`oidc.getUserInfo()`),
 not just the id‑token.
 
-### 2.6 User model
+### 2.6 User model — **files:** `entity/User.java` + `repository/UserRepository.java`
 
-Add a stable link column + finder:
+(RMIS: `backend/src/main/java/com/risa/rmis/entity/User.java` and
+`backend/src/main/java/com/risa/rmis/repository/UserRepository.java`.) Add a
+stable link column to the entity and a finder to the repository:
 
 ```java
+// in entity/User.java
 @Column(name = "sso_subject", unique = true) private String ssoSubject;   // entity
+// in repository/UserRepository.java
 Optional<User> findBySsoSubject(String ssoSubject);                       // repository
 ```
 
@@ -214,7 +252,18 @@ Optional<User> findBySsoSubject(String ssoSubject);                       // rep
 
 ## 3. Frontend — Angular
 
-### 3.1 Login button
+> **Where the frontend code lives.** All paths below are relative to the app's
+> Angular project (RMIS: `rmis/frontend/`). Components live under
+> `src/app/<component>/`, shared services under `src/app/services/`, and
+> build/env config at the project root and `src/environments/`.
+
+### 3.1 Login button — **file:** `frontend/src/app/login/login.component.ts`
+
+**Two parts — both required.** Adding the handler alone does nothing visible;
+you must also place a button in the template that calls it, or there's no way to
+start SSO from the UI.
+
+**(a) The handler** (class method):
 
 ```ts
 loginWithSso(): void {
@@ -223,17 +272,66 @@ loginWithSso(): void {
 }
 ```
 
-### 3.2 Environments
+(Make sure `environment` is imported:
+`import { environment } from '../../environments/environment';`.)
 
-```ts
-// environment.ts (dev)
-ssoLoginUrl: 'http://127.0.0.1:8085/oauth2/authorization/gor'
-// environment.prod.ts — absolute backend URL so the browser hits the backend
-// DIRECTLY (no nginx proxy needed for /oauth2 and /login):
-ssoLoginUrl: 'http://localhost:8085/oauth2/authorization/gor'
+**(b) The button** — add it to the component's `template`, *outside* the
+`<form>` so it isn't a submit (use `type="button"` and `(click)`, not the form's
+`ngSubmit`):
+
+```html
+<!-- after the local sign-in <form>…</form> -->
+<div class="auth-divider"><span>or</span></div>
+<button type="button" class="btn-sso" (click)="loginWithSso()">
+  Sign in with GoR SSO
+</button>
 ```
 
+> If your styles don't already have `.btn-sso` / `.auth-divider`, add them (or
+> reuse an existing button class) — without a rule the button still works, it
+> just looks unstyled.
+
+### 3.2 Environments — **files:** `frontend/src/environments/environment.ts` + `environment.prod.ts`
+
+Add **all four** SSO keys to **both** environment files (the last three are
+required by the §3.6 logout). `ssoLoginUrl` points the browser at the backend's
+`/oauth2/authorization/<id>`; `ssoLogoutUrl` is the wrapper's browser-facing
+logout; `postLogoutRedirectUri` is the SPA page to land on after logout (**must
+be registered on the Keycloak client**, §3.6); `ssoClientId` is your Keycloak
+client id.
+
+```ts
+// environment.ts (dev) — browser hits the backend's published host port directly
+export const environment = {
+  production: false,
+  apiUrl: 'http://127.0.0.1:8085/api',
+  ssoLoginUrl: 'http://127.0.0.1:8085/oauth2/authorization/gor',
+  ssoLogoutUrl: 'http://localhost:8000/oauth2/logout',   // wrapper, browser-facing
+  postLogoutRedirectUri: 'http://localhost:4200/login',  // where to land after logout
+  ssoClientId: 'rmis-portal',                            // your Keycloak client id
+};
+```
+
+```ts
+// environment.prod.ts — same keys; values match where the SPA is actually served
+export const environment = {
+  production: true,
+  apiUrl: '/api',
+  ssoLoginUrl: 'http://localhost:8085/oauth2/authorization/gor',
+  ssoLogoutUrl: 'http://localhost:8000/oauth2/logout',
+  postLogoutRedirectUri: 'http://localhost/login',       // nginx-served SPA (host :80)
+  ssoClientId: 'rmis-portal',
+};
+```
+
+> Keep the key set **identical** across both files or the prod build fails to
+> type-check. `postLogoutRedirectUri` differs per environment because the SPA is
+> served from a different origin (dev `:4200` vs prod nginx) — register **each**
+> value you use on the client (§3.6).
+
 ### 3.3 Callback component + route (reusable across apps)
+
+**New file:** `frontend/src/app/sso-callback/sso-callback.component.ts`
 
 ```ts
 // /sso/callback — backend redirects here with #token=<jwt>
@@ -247,13 +345,17 @@ ngOnInit(): void {
 }
 ```
 
+**Register the route** in `frontend/src/app/app.routes.ts`:
+
 ```ts
 // app.routes.ts — public route (user isn't "logged in" until this runs)
 { path: 'sso/callback',
   loadComponent: () => import('./sso-callback/sso-callback.component').then(m => m.SsoCallbackComponent) }
 ```
 
-### 3.4 AuthService — store a session from a token
+### 3.4 AuthService — store a session from a token — **file:** `frontend/src/app/services/auth.service.ts`
+
+Add this method to your existing `AuthService`:
 
 ```ts
 loginWithSsoToken(token: string): void {
@@ -267,7 +369,9 @@ loginWithSsoToken(token: string): void {
 > The minted JWT only carries what your `JwtTokenProvider` puts in it (RMIS:
 > just `sub`). Add `email`/`name` claims there if you want them on the SPA.
 
-### 3.5 Production build picks the prod env (`angular.json`)
+### 3.5 Production build picks the prod env — **file:** `frontend/angular.json`
+
+Under `projects.<app>.architect.build.configurations`:
 
 ```json
 "production": {
@@ -291,7 +395,9 @@ The platform is stateless after login (the SPA holds a minted app JWT, not a
 server session), so capture the **id_token at token-exchange time** and hand it
 to the SPA — mirroring how the app JWT is passed.
 
-**Backend** — in the success handler, add the id_token to the callback fragment:
+**Backend** — in the success handler
+(`backend/src/main/java/<base-package>/security/SsoLoginSuccessHandler.java`,
+the §2.5 file), add the id_token to the callback fragment:
 
 ```java
 String idToken = oidc.getIdToken().getTokenValue();   // returned at code->token exchange
@@ -301,22 +407,42 @@ res.sendRedirect(UriComponentsBuilder.fromUriString(frontendUrl)
     .build().toUriString());
 ```
 
-**Frontend** — callback stores the id_token; `logout()` redirects to the
+**Frontend** — in `frontend/src/app/services/auth.service.ts` (the §3.4 file):
+store the id_token when the callback runs, then **replace your existing
+`logout()`** with the version below (don't add a second `logout()` — TypeScript
+rejects two methods with the same name). This single method first clears the
+local session, then — only if an id_token was stored — redirects to the
 wrapper's `/oauth2/logout` (browser-facing, like authorize → `:8000`):
 
 ```ts
+private readonly ID_TOKEN_KEY = 'id_token';   // add alongside TOKEN_KEY / USER_KEY
+
+// store this in your loginWithSsoToken()/callback when the fragment has id_token:
+//   if (idToken) localStorage.setItem(this.ID_TOKEN_KEY, idToken);
+
 logout(): void {
-  const idToken = localStorage.getItem(ID_TOKEN_KEY);
-  // clear local session first (token, user, id_token) …
+  const idToken = localStorage.getItem(this.ID_TOKEN_KEY);
+  // clear the local session FIRST (token, user, id_token)
+  localStorage.removeItem(this.TOKEN_KEY);
+  localStorage.removeItem(this.USER_KEY);
+  localStorage.removeItem(this.ID_TOKEN_KEY);
+  this.currentUser$.next(null);                // if you expose a current-user subject
+
   if (idToken) {
-    window.location.href = `${env.ssoLogoutUrl}`            // http://localhost:8000/oauth2/logout
-      + `?post_logout_redirect_uri=${encodeURIComponent(env.postLogoutRedirectUri)}`
-      + `&client_id=${encodeURIComponent(env.ssoClientId)}`  // REQUIRED by the wrapper (see note)
-      + `&id_token_hint=${encodeURIComponent(idToken)}`;     // full-page nav
+    window.location.href = `${environment.ssoLogoutUrl}`             // http://localhost:8000/oauth2/logout
+      + `?post_logout_redirect_uri=${encodeURIComponent(environment.postLogoutRedirectUri)}`
+      + `&client_id=${encodeURIComponent(environment.ssoClientId)}`  // REQUIRED by the wrapper (see note)
+      + `&id_token_hint=${encodeURIComponent(idToken)}`;             // full-page nav
     return;
   }
   this.router.navigate(['/login']);   // local login: nothing to end remotely
 }
+```
+
+> Add `ssoLogoutUrl`, `postLogoutRedirectUri`, and `ssoClientId` to both
+> environment files (§3.2). The `if (idToken)` branch only fires when the SSO
+> callback actually stored an id_token — so the same `logout()` works for both
+> local and SSO sessions.
 ```
 
 > **`client_id` is mandatory on the wrapper's `/oauth2/logout`** whenever
@@ -371,6 +497,8 @@ container is the container itself — not the host. So:
 - Add `extra_hosts: ["host.docker.internal:host-gateway"]` (needed on Linux;
   automatic on Docker Desktop).
 
+**File:** `rmis/docker-compose.yml` (the `backend` service's `environment:`):
+
 ```yaml
 backend:
   ports: ["8085:8080"]
@@ -394,10 +522,12 @@ the backend's host port directly (`ssoLoginUrl`), so Spring derives the right
 
 ## 5. Secrets
 
-- Never commit the client secret. Pass it via a **gitignored** `.env` that
-  compose substitutes: `CLIENT_SECRET: ${CLIENT_SECRET:?…}` + `rmis/.env`.
-- `.gitignore` should cover `**/.env`, `**/target/`, `**/node_modules/`,
-  `*.class`, `.idea/`.
+- Never commit the client secret. Pass it via a **gitignored** `.env` next to
+  the compose file (**file:** `rmis/.env`, containing `CLIENT_SECRET=…`) that
+  compose substitutes: `CLIENT_SECRET: ${CLIENT_SECRET:?…}` in
+  `rmis/docker-compose.yml`.
+- The repo-root `.gitignore` (`clients/.gitignore`) should cover `**/.env`,
+  `**/target/`, `**/node_modules/`, `*.class`, `.idea/`.
 
 ---
 
@@ -438,15 +568,25 @@ Then click the button in the browser for the full SPA path.
 
 ## 8. New‑app checklist
 
+Paths shown for RMIS (`rmis/`, base package `com.risa.rmis`); substitute yours.
+
 - [ ] Register client; redirect URI `…/login/oauth2/code/<id>` (both host variants)
-- [ ] Backend: add `oauth2-client` dep, `app.sso.*` props, `SsoClientConfig`,
-      `SsoLoginSuccessHandler`, `SecurityConfig` (PKCE + 401 + IF_REQUIRED),
-      `ssoSubject` column + finder
-- [ ] Frontend: button → `ssoLoginUrl`, `/sso/callback` component + route,
-      `loginWithSsoToken`, `angular.json` `fileReplacements`
-- [ ] Logout: capture `id_token` in success handler → SPA; `logout()` →
-      wrapper `/oauth2/logout` with `id_token_hint` + `client_id` +
-      `post_logout_redirect_uri`; register that redirect URI on the client (§3.6)
-- [ ] Docker: `server.port=8080`, `host.docker.internal` for fetched URLs,
-      `extra_hosts`, SSO env, secret via gitignored `.env`
+- [ ] Backend:
+  - [ ] `backend/pom.xml` — add `oauth2-client` dep (§2.1)
+  - [ ] `backend/src/main/resources/application.properties` — `app.sso.*` props (§2.2)
+  - [ ] `backend/src/main/java/com/risa/rmis/config/SsoClientConfig.java` — **new** (§2.3)
+  - [ ] `backend/src/main/java/com/risa/rmis/config/SecurityConfig.java` — PKCE + 401 + IF_REQUIRED (§2.4)
+  - [ ] `backend/src/main/java/com/risa/rmis/security/SsoLoginSuccessHandler.java` — **new** (§2.5)
+  - [ ] `backend/src/main/java/com/risa/rmis/entity/User.java` — `ssoSubject` column; `…/repository/UserRepository.java` — finder (§2.6)
+- [ ] Frontend:
+  - [ ] `frontend/src/app/login/login.component.ts` — button → `ssoLoginUrl` (§3.1)
+  - [ ] `frontend/src/environments/environment.ts` + `environment.prod.ts` — SSO URLs (§3.2)
+  - [ ] `frontend/src/app/sso-callback/sso-callback.component.ts` — **new** + route in `frontend/src/app/app.routes.ts` (§3.3)
+  - [ ] `frontend/src/app/services/auth.service.ts` — `loginWithSsoToken` (§3.4)
+  - [ ] `frontend/angular.json` — `fileReplacements` (§3.5)
+- [ ] Logout (§3.6): `SsoLoginSuccessHandler.java` captures `id_token` → SPA;
+      `auth.service.ts` `logout()` → wrapper `/oauth2/logout` with `id_token_hint`
+      + `client_id` + `post_logout_redirect_uri`; register that redirect URI on the client
+- [ ] Docker (`rmis/docker-compose.yml`): `server.port=8080`, `host.docker.internal`
+      for fetched URLs, `extra_hosts`, SSO env, secret via gitignored `rmis/.env`
 - [ ] Test the scripted flow → row written → browser click

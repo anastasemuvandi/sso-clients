@@ -1,6 +1,7 @@
 package com.risa.ikimina.config;
 
 import com.risa.ikimina.security.JwtAuthenticationFilter;
+import com.risa.ikimina.security.SsoLoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -37,20 +41,43 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
+    // SsoLoginSuccessHandler / ClientRegistrationRepository are injected as METHOD
+    // params (not fields): the handler needs PasswordEncoder, which is defined in
+    // this class, so a field injection here would create a bean cycle.
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            SsoLoginSuccessHandler ssoLoginSuccessHandler,
+            ClientRegistrationRepository clientRegistrationRepository) throws Exception {
+
+        // PKCE is REQUIRED by the wrapper, but Spring skips it for confidential
+        // clients by default — re-enable it on the authorize request.
+        var pkceResolver = new DefaultOAuth2AuthorizationRequestResolver(
+                clientRegistrationRepository, "/oauth2/authorization");
+        pkceResolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
+
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // IF_REQUIRED (not STATELESS): the OAuth2 login round-trip stores
+            // state/PKCE in the session; the JWT filter keeps API calls stateless.
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
-                // login, register, 2FA verification and password reset are all public
-                .requestMatchers("/api/auth/**").permitAll()
+                // local auth + the SSO login endpoints are all public
+                .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**").permitAll()
                 .anyRequest().authenticated()
             )
-            // unauthenticated API calls get a clean 401, never a redirect
+            // unauthenticated API calls get a clean 401, never a redirect to the IdP
             .exceptionHandling(e -> e.authenticationEntryPoint(
                 new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+            .oauth2Login(o -> o
+                .authorizationEndpoint(a -> a.authorizationRequestResolver(pkceResolver))
+                .successHandler(ssoLoginSuccessHandler)
+                .failureHandler((req, res, ex) ->
+                    res.sendRedirect(frontendUrl + "/login?sso_error=sso_login_failed")))
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

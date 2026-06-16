@@ -24,6 +24,11 @@ export const routes: Routes = [
     loadComponent: () => import('./reset-password/reset-password.component').then(m => m.ResetPasswordComponent)
   },
   {
+    // Public: the user isn't "logged in" until this component stores the token.
+    path: 'sso/callback',
+    loadComponent: () => import('./sso-callback/sso-callback.component').then(m => m.SsoCallbackComponent)
+  },
+  {
     path: 'dashboard',
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent),
     canActivate: [authGuard]

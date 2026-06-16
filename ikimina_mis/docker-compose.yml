@@ -47,8 +47,26 @@ services:
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
       MAIL_FROM: no-reply@ikimina.gov.rw
+      # [GoR-SSO] OIDC client config (see backend application.properties for what each does)
+      CLIENT_ID: ikimina-portal                                                              # [GoR-SSO]
+      # [GoR-SSO] Secret is NOT committed — supplied via ikimina_mis/.env (gitignored) at `up` time.
+      CLIENT_SECRET: ${CLIENT_SECRET:?CLIENT_SECRET must be set (see ikimina_mis/.env)}        # [GoR-SSO]
+      # [GoR-SSO] iss is COMPARED only -> keep the value Keycloak stamps (localhost:8080)
+      SSO_ISSUER_URI: http://localhost:8080/realms/government-internal                        # [GoR-SSO]
+      # [GoR-SSO] these are FETCHED/redirected server-side from inside the container, so
+      # [GoR-SSO] Keycloak/wrapper are reached via host.docker.internal (host-published ports)
+      SSO_JWK_SET_URI: http://host.docker.internal:8080/realms/government-internal/protocol/openid-connect/certs  # [GoR-SSO]
+      SSO_TOKEN_URI: http://host.docker.internal:8000/oauth2/token                            # [GoR-SSO]
+      SSO_USERINFO_URI: http://host.docker.internal:8000/auth/userinfo                        # [GoR-SSO]
+      # [GoR-SSO] authorization-uri is browser-facing -> localhost (the host's :8000)
+      SSO_AUTH_URI: http://localhost:8000/oauth2/authorize                                    # [GoR-SSO]
+      # [GoR-SSO] after login, bounce the browser back to the Ikimina SPA (host :8180)
+      FRONTEND_URL: http://localhost:8180                                                     # [GoR-SSO]
     ports:
       - "8186:8080"
+    # [GoR-SSO] lets the container resolve host.docker.internal to the host gateway
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
