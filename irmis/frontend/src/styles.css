@@ -1,0 +1,103 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; }
+
+/* ── Shared auth-card layout (login, register) ────────────────────────────── */
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #0f3d6e 0%, #2563eb 100%);
+}
+.auth-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 430px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.auth-header { text-align: center; margin-bottom: 28px; }
+.auth-header .logo {
+  display: inline-block;
+  background: #2563eb;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.auth-header h2 { margin: 0 0 6px; color: #1a1a2e; font-size: 22px; }
+.auth-header p  { margin: 0; color: #6b7280; font-size: 14px; }
+
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.form-group input {
+  width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db;
+  border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box;
+  transition: border-color .2s;
+}
+.form-group input:focus { border-color: #2563eb; }
+.form-group input:disabled { background: #f3f4f6; color: #6b7280; }
+
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 44px; }
+.toggle-pw {
+  position: absolute; top: 0; right: 0; height: 100%; width: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; padding: 0; margin: 0;
+  color: #9ca3af; cursor: pointer;
+}
+.toggle-pw:hover { color: #6b7280; }
+.toggle-pw:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; border-radius: 6px; }
+
+.btn-primary {
+  width: 100%; padding: 12px; background: #2563eb; color: #fff;
+  border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+  cursor: pointer; margin-top: 8px; display: flex; align-items: center;
+  justify-content: center; gap: 8px; transition: background .2s;
+}
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { opacity: .7; cursor: not-allowed; }
+
+/* Divider between local sign-in and the SSO button. */
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0; color: #9ca3af; font-size: 13px;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: #e5e7eb;
+}
+
+/* "Sign in with GoR SSO" — secondary style so it reads distinct from the primary submit. */
+.btn-sso {
+  width: 100%; padding: 12px; background: #fff; color: #2563eb;
+  border: 1px solid #2563eb; border-radius: 8px; font-size: 15px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; gap: 8px; transition: background .2s, color .2s;
+}
+.btn-sso:hover { background: #2563eb; color: #fff; }
+
+.spinner {
+  width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-alert {
+  background: #fee2e2; color: #dc2626; border-radius: 8px;
+  padding: 10px 14px; font-size: 13px; margin-bottom: 12px;
+}
+.success-alert {
+  background: #dbeafe; color: #1d4ed8; border-radius: 8px;
+  padding: 10px 14px; font-size: 13px; margin-bottom: 12px;
+}
+.hint { font-size: 13px; color: #6b7280; margin-bottom: 16px; text-align: center; }
+
+.auth-footer { text-align: center; margin-top: 22px; font-size: 14px; color: #6b7280; }
+.auth-footer a { color: #2563eb; cursor: pointer; font-weight: 600; }
+.auth-footer a:hover { text-decoration: underline; }
+.auth-footer + .auth-footer { margin-top: 8px; }

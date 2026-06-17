@@ -1,0 +1,24 @@
+{
+  "clientId": "irmis-portal",
+  "name": "IRMIS Portal",
+  "enabled": true,
+  "publicClient": false,
+  "clientAuthenticatorType": "client-secret",
+  "secret": "irmis-secret-key",
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "redirectUris": [
+    "http://localhost:8200/login/oauth2/code/gor",
+    "http://127.0.0.1:8200/login/oauth2/code/gor"
+  ],
+  "webOrigins": [
+    "http://localhost:8200",
+    "http://127.0.0.1:8200",
+    "http://localhost:8201"
+  ],
+  "attributes": {
+    "post.logout.redirect.uris": "http://localhost:8201/login",
+    "pkce.code.challenge.method": "S256"
+  },
+  "protocol": "openid-connect"
+}
