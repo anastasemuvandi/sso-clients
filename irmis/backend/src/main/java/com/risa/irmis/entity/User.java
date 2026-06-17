@@ -34,6 +34,13 @@ public class User {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    /** Access role. Defaults to USER so locally- and SSO-created accounts are
+     *  non-privileged unless explicitly promoted. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private Role role = Role.USER;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

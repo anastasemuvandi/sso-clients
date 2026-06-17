@@ -12,6 +12,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,8 +34,11 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity   // enables @PreAuthorize on controller methods (e.g. admin-only endpoints)
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
@@ -80,8 +84,10 @@ public class SecurityConfig {
             .oauth2Login(o -> o
                 .authorizationEndpoint(a -> a.authorizationRequestResolver(pkceResolver))
                 .successHandler(ssoLoginSuccessHandler)
-                .failureHandler((req, res, ex) ->
-                    res.sendRedirect(frontendUrl + "/login?sso_error=sso_login_failed")))
+                .failureHandler((req, res, ex) -> {
+                    log.error("SSO login failed: {}", ex.getMessage(), ex);
+                    res.sendRedirect(frontendUrl + "/login?sso_error=sso_login_failed");
+                }))
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

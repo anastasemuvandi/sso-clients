@@ -12,6 +12,7 @@ import { AuthService, UserProfile } from '../services/auth.service';
       <header class="topbar">
         <div class="brand">IRMIS</div>
         <nav class="nav">
+          <a *ngIf="isAdmin" class="btn-link" routerLink="/users">Manage users</a>
           <button class="btn-logout" (click)="logout()">Logout</button>
         </nav>
       </header>
@@ -25,7 +26,12 @@ import { AuthService, UserProfile } from '../services/auth.service';
             <div class="info-item"><span class="k">Email</span><span class="v">{{ profile.email }}</span></div>
             <div class="info-item"><span class="k">Full name</span><span class="v">{{ profile.fullName || '—' }}</span></div>
             <div class="info-item"><span class="k">Phone</span><span class="v">{{ profile.phoneNumber || '—' }}</span></div>
+            <div class="info-item"><span class="k">Role</span><span class="v"><span class="badge" [class.admin]="profile.role === 'ADMIN'">{{ profile.role }}</span></span></div>
             <div class="info-item"><span class="k">Member since</span><span class="v">{{ profile.createdAt | date:'mediumDate' }}</span></div>
+          </div>
+
+          <div *ngIf="isAdmin" class="admin-cta">
+            <a routerLink="/users" class="btn-primary">View all users →</a>
           </div>
         </div>
       </main>
@@ -39,6 +45,8 @@ import { AuthService, UserProfile } from '../services/auth.service';
     }
     .brand { font-weight: 800; letter-spacing: 2px; }
     .nav { display: flex; align-items: center; gap: 16px; }
+    .btn-link { color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; opacity: .9; }
+    .btn-link:hover { opacity: 1; text-decoration: underline; }
     .btn-logout {
       background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3);
       padding: 7px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;
@@ -52,12 +60,23 @@ import { AuthService, UserProfile } from '../services/auth.service';
     .info-item { display: flex; flex-direction: column; gap: 4px; background: #f8fafc; border-radius: 10px; padding: 14px 16px; }
     .info-item .k { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #9ca3af; }
     .info-item .v { font-size: 15px; color: #1f2937; font-weight: 600; word-break: break-all; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+             background: #eef2f7; color: #475569; }
+    .badge.admin { background: #0f3d6e; color: #fff; }
+    .admin-cta { margin-top: 24px; }
+    .btn-primary { display: inline-block; background: #0f3d6e; color: #fff; text-decoration: none;
+                   padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+    .btn-primary:hover { background: #0d3460; }
   `]
 })
 export class DashboardComponent implements OnInit {
   profile: UserProfile | null = null;
 
   constructor(private auth: AuthService, private router: Router) {}
+
+  get isAdmin(): boolean {
+    return this.profile?.role === 'ADMIN';
+  }
 
   ngOnInit(): void {
     this.auth.getProfile().subscribe({

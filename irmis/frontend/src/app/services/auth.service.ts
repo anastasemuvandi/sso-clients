@@ -8,6 +8,7 @@ export interface AuthResponse {
   token: string;
   email: string;
   fullName: string;
+  role?: string;            // 'ADMIN' | 'USER' — drives role-based UI
 }
 
 export interface MessageResponse {
@@ -18,6 +19,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   phoneNumber: string;
+  role: string;             // 'ADMIN' | 'USER'
   createdAt: string;
 }
 
@@ -62,7 +64,29 @@ export class AuthService {
   // ── Profile (authenticated) ─────────────────────────────────────────────────
 
   getProfile(): Observable<UserProfile> {
-    return this.http.get<UserProfile>(`${environment.apiUrl}/user/me`);
+    return this.http.get<UserProfile>(`${environment.apiUrl}/user/me`).pipe(
+      // Persist the role onto the stored session so isAdmin() works on the next
+      // navigation — covers SSO sign-ins, where the role isn't known at login.
+      tap(p => this.mergeRole(p.role))
+    );
+  }
+
+  /** ADMIN only — the backend returns 403 for non-admins. */
+  listUsers(): Observable<UserProfile[]> {
+    return this.http.get<UserProfile[]>(`${environment.apiUrl}/user/all`);
+  }
+
+  isAdmin(): boolean {
+    return this.currentUser$.value?.role === 'ADMIN';
+  }
+
+  private mergeRole(role: string): void {
+    const current = this.currentUser$.value;
+    if (current && current.role !== role) {
+      const updated = { ...current, role };
+      localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
+      this.currentUser$.next(updated);
+    }
   }
 
   // ── Session helpers ──────────────────────────────────────────────────────────
